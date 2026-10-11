@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Demo de Atendimentos</title>
+  <style>
+    :root { color-scheme: light; --ink:#203040; --muted:#607080; --line:#dbe3ea; --bg:#f4f7fa; --white:#fff; --blue:#245b83; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, Helvetica, sans-serif; color:var(--ink); background:var(--bg); }
+    header { background:var(--blue); color:white; padding:28px 20px; }
+    header .wrap, main { max-width:1050px; margin:0 auto; }
+    h1 { margin:0 0 8px; font-size:clamp(1.5rem, 3vw, 2rem); }
+    header p { margin:0; line-height:1.5; opacity:.94; }
+    main { padding:24px 20px 40px; }
+    .notice { border:1px solid #ead6a4; background:#fff8e7; color:#674e13; padding:12px 14px; border-radius:10px; margin-bottom:18px; font-size:.92rem; line-height:1.5; }
+    .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px; }
+    .card { background:var(--white); border:1px solid var(--line); border-radius:12px; padding:18px; }
+    .card .label { color:var(--muted); font-size:.9rem; }
+    .card .number { font-size:2rem; font-weight:700; margin-top:8px; }
+    .toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin:20px 0 12px; }
+    input, select, button { font:inherit; border:1px solid #bdcbd7; border-radius:8px; padding:10px 12px; background:white; }
+    input { min-width:220px; flex:1; }
+    button { cursor:pointer; background:var(--blue); color:white; border-color:var(--blue); }
+    button:hover { filter:brightness(.94); }
+    .table-wrap { overflow-x:auto; background:white; border:1px solid var(--line); border-radius:12px; }
+    table { width:100%; border-collapse:collapse; min-width:650px; }
+    th, td { padding:13px 14px; text-align:left; border-bottom:1px solid #e8edf2; font-size:.94rem; }
+    th { background:#f8fafc; color:#465969; }
+    tr:last-child td { border-bottom:0; }
+    .status { display:inline-block; border-radius:999px; padding:5px 9px; font-size:.82rem; background:#e8eef5; }
+    .status.Concluído { background:#e0f3e7; color:#205d36; }
+    .status.Agendado { background:#e1effb; color:#174e78; }
+    .status.Pendente { background:#fff0d7; color:#7c5310; }
+    .foot { color:var(--muted); font-size:.85rem; line-height:1.5; margin-top:18px; }
+    @media (max-width:700px) { .cards { grid-template-columns:1fr; } main { padding:18px 12px 30px; } header { padding:22px 14px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Painel Demo de Atendimentos</h1>
+      <p>Projeto demonstrativo de organização de informações para rotinas de saúde.</p>
+    </div>
+  </header>
+  <main>
+    <div class="notice"><strong>Importante:</strong> este projeto usa exclusivamente dados fictícios para demonstração. Não insira nomes, dados pessoais ou informações reais de pacientes.</div>
+    <section class="cards" aria-label="Indicadores">
+      <div class="card"><div class="label">Registros exibidos</div><div class="number" id="total">0</div></div>
+      <div class="card"><div class="label">Concluídos</div><div class="number" id="done">0</div></div>
+      <div class="card"><div class="label">Pendentes</div><div class="number" id="pending">0</div></div>
+    </section>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Buscar por serviço ou unidade" aria-label="Buscar registros">
+      <select id="filter" aria-label="Filtrar por situação">
+        <option value="Todos">Todas as situações</option>
+        <option value="Agendado">Agendado</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Concluído">Concluído</option>
+      </select>
+      <button id="reset" type="button">Limpar filtros</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Unidade (fictícia)</th><th>Serviço</th><th>Situação</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="foot">Projeto de portfólio para fins educacionais. Os registros abaixo são exemplos fictícios e não representam dados de nenhum município ou serviço real.</p>
+  </main>
+  <script>
+    const records = [
+      { date: "05/10/2026", unit: "Unidade Alfa", service: "Consulta clínica", status: "Concluído" },
+      { date: "06/10/2026", unit: "Unidade Beta", service: "Vacinação", status: "Agendado" },
+      { date: "06/10/2026", unit: "Unidade Gama", service: "Acompanhamento", status: "Pendente" },
+      { date: "07/10/2026", unit: "Unidade Alfa", service: "Consulta clínica", status: "Agendado" },
+      { date: "08/10/2026", unit: "Unidade Beta", service: "Retorno", status: "Concluído" },
+      { date: "09/10/2026", unit: "Unidade Gama", service: "Vacinação", status: "Pendente" },
+      { date: "10/10/2026", unit: "Unidade Alfa", service: "Acompanhamento", status: "Concluído" }
+    ];
+    const search = document.getElementById("search");
+    const filter = document.getElementById("filter");
+    const rows = document.getElementById("rows");
+    const total = document.getElementById("total");
+    const done = document.getElementById("done");
+    const pending = document.getElementById("pending");
+
+    function render() {
+      const term = search.value.trim().toLocaleLowerCase("pt-BR");
+      const status = filter.value;
+      const visible = records.filter(item => {
+        const matchesText = (item.unit + " " + item.service).toLocaleLowerCase("pt-BR").includes(term);
+        const matchesStatus = status === "Todos" || item.status === status;
+        return matchesText && matchesStatus;
+      });
+      rows.replaceChildren();
+      visible.forEach(item => {
+        const tr = document.createElement("tr");
+        [item.date, item.unit, item.service].forEach(value => {
+          const td = document.createElement("td");
+          td.textContent = value;
+          tr.appendChild(td);
+        });
+        const td = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.className = "status " + item.status;
+        badge.textContent = item.status;
+        td.appendChild(badge);
+        tr.appendChild(td);
+        rows.appendChild(tr);
+      });
+      total.textContent = visible.length;
+      done.textContent = visible.filter(x => x.status === "Concluído").length;
+      pending.textContent = visible.filter(x => x.status === "Pendente").length;
+      if (!visible.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.textContent = "Nenhum registro encontrado.";
+        tr.appendChild(td);
+        rows.appendChild(tr);
+      }
+    }
+    search.addEventListener("input", render);
+    filter.addEventListener("change", render);
+    document.getElementById("reset").addEventListener("click", () => {
+      search.value = "";
+      filter.value = "Todos";
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>
